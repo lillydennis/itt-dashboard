@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ITT Impact Measurement Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Source+Sans+3:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --maroon: #6B1A1A;
+    --maroon2: #8B2E2E;
+    --orange: #C4521A;
+    --teal: #1D6B5A;
+    --purple: #4A3B8C;
+    --maroon-bg: #FDF5F4;
+    --orange-bg: #FEF6EF;
+    --teal-bg: #EDF8F4;
+    --purple-bg: #F3F1FB;
+    --text: #1a1a1a;
+    --text-muted: #6b6b6b;
+    --border: #e4e0d8;
+    --bg: #f7f5f0;
+    --white: #ffffff;
+    --green: #1a6b3a;
+    --green-bg: #d4edda;
+    --yellow: #856404;
+    --yellow-bg: #fff3cd;
+  }
+
+  body {
+    font-family: 'Source Sans 3', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ── Header ─────────────────────────────── */
+  .header {
+    background: var(--maroon);
+    padding: 24px 40px 20px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .header-left h1 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 28px;
+    color: #fff;
+    letter-spacing: -0.3px;
+    line-height: 1.2;
+  }
+
+  .header-left p {
+    font-size: 13px;
+    color: rgba(255,255,255,0.72);
+    margin-top: 4px;
+  }
+
+  .header-left p strong { color: rgba(255,255,255,0.95); }
+
+  .lilly-logo {
+    font-family: 'Playfair Display', serif;
+    font-size: 22px;
+    color: rgba(255,255,255,0.6);
+    font-style: italic;
+    letter-spacing: 1px;
+  }
+
+  /* ── Controls bar ───────────────────────── */
+  .controls-bar {
+    background: var(--white);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 40px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .controls-bar label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+  }
+
+  .q-btn {
+    padding: 5px 18px;
+    border-radius: 20px;
+    border: 1.5px solid var(--border);
+    background: transparent;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-family: 'Source Sans 3', sans-serif;
+    transition: all 0.15s;
+  }
+
+  .q-btn:hover { border-color: var(--maroon); color: var(--maroon); }
+  .q-btn.active { background: var(--maroon); color: #fff; border-color: var(--maroon); }
+
+  .upload-btn {
+    margin-left: auto;
+    padding: 6px 18px;
+    background: var(--maroon);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'Source Sans 3', sans-serif;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: opacity 0.15s;
+  }
+
+  .upload-btn:hover { opacity: 0.85; }
+
+  #file-input { display: none; }
+
+  .data-source-badge {
+    font-size: 11px;
+    color: var(--teal);
+    font-weight: 600;
+    background: var(--teal-bg);
+    padding: 3px 10px;
+    border-radius: 12px;
+    border: 1px solid #9fd8c6;
+  }
+
+  /* ── Main layout ────────────────────────── */
+  .main { padding: 28px 40px; max-width: 1400px; margin: 0 auto; }
+
+  /* ── Summary cards ──────────────────────── */
+  .summary-strip {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+
+  .sum-card {
+    background: var(--white);
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    padding: 16px 18px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .sum-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 4px; height: 100%;
+    border-radius: 10px 0 0 10px;
+  }
+
+  .sum-card.c1::before { background: var(--maroon); }
+  .sum-card.c2::before { background: var(--orange); }
+  .sum-card.c3::before { background: var(--teal); }
+  .sum-card.c4::before { background: var(--purple); }
+
+  .sum-card .sum-num {
+    font-size: 30px;
+    font-weight: 700;
+    font-family: 'Playfair Display', serif;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .sum-card.c1 .sum-num { color: var(--maroon); }
+  .sum-card.c2 .sum-num { color: var(--orange); }
+  .sum-card.c3 .sum-num { color: var(--teal); }
+  .sum-card.c4 .sum-num { color: var(--purple); }
+
+  .sum-card .sum-label { font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+  .sum-card .sum-sub { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+
+  .pct-good { color: var(--green); font-weight: 700; }
+  .pct-warn { color: var(--yellow); font-weight: 700; }
+
+  /* ── Dimension cards grid ───────────────── */
+  .dim-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+
+  .dim-card {
+    background: var(--white);
+    border-radius: 12px;
+    border: 1.5px solid var(--border);
+    overflow: hidden;
+    cursor: pointer;
+    transition: box-shadow 0.15s, border-color 0.15s;
+  }
+
+  .dim-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+
+  .dim-card.active-card { border-width: 2px; }
+  .dim-card.d1.active-card { border-color: var(--maroon); }
+  .dim-card.d2.active-card { border-color: var(--orange); }
+  .dim-card.d3.active-card { border-color: var(--teal); }
+  .dim-card.d4.active-card { border-color: var(--purple); }
+
+  .dim-head {
+    padding: 14px 14px 10px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .dim-num-circle {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; color: #fff;
+    flex-shrink: 0;
+  }
+
+  .d1 .dim-num-circle { background: var(--maroon); }
+  .d2 .dim-num-circle { background: var(--orange); }
+  .d3 .dim-num-circle { background: var(--teal); }
+  .d4 .dim-num-circle { background: var(--purple); }
+
+  .dim-title-wrap .dim-title {
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.3;
+  }
+  .d1 .dim-title { color: #4a1010; }
+  .d2 .dim-title { color: #7a3210; }
+  .d3 .dim-title { color: #0d4a3a; }
+  .d4 .dim-title { color: #2d2460; }
+
+  .dim-tag {
+    margin: 0 14px 10px;
+    padding: 4px 10px;
+    border-radius: 5px;
+    font-size: 10px;
+    font-weight: 700;
+    text-align: center;
+    color: #fff;
+    letter-spacing: 0.3px;
+  }
+
+  .d1 .dim-tag { background: var(--maroon); }
+  .d2 .dim-tag { background: var(--orange); }
+  .d3 .dim-tag { background: var(--teal); }
+  .d4 .dim-tag { background: var(--purple); }
+
+  .dim-body { padding: 0 14px 14px; }
+
+  .metric-section-label {
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 8px;
+  }
+
+  .metric-row {
+    margin-bottom: 8px;
+  }
+
+  .metric-row-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 3px;
+  }
+
+  .metric-row-top .m-label {
+    font-size: 10px;
+    color: var(--text);
+    line-height: 1.3;
+    flex: 1;
+  }
+
+  .metric-row-top .m-vals {
+    font-size: 10px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .m-vals.good { color: var(--green); }
+  .m-vals.warn { color: var(--yellow); }
+  .m-vals.neutral { color: var(--text-muted); }
+
+  .mini-bar {
+    height: 4px;
+    border-radius: 3px;
+    background: #e8e4dc;
+    overflow: hidden;
+  }
+
+  .mini-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.5s cubic-bezier(.4,0,.2,1);
+  }
+
+  .d1 .mini-bar-fill { background: var(--maroon); }
+  .d2 .mini-bar-fill { background: var(--orange); }
+  .d3 .mini-bar-fill { background: var(--teal); }
+  .d4 .mini-bar-fill { background: var(--purple); }
+
+  /* ── Detail Panel ────────────────────────── */
+  .detail-panel {
+    display: none;
+    background: var(--white);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    padding: 22px 24px;
+    margin-bottom: 28px;
+    animation: slideDown 0.2s ease;
+  }
+
+  @keyframes slideDown {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .detail-panel.visible { display: block; }
+
+  .detail-panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+
+  .detail-panel-head h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 16px;
+    color: var(--text);
+  }
+
+  .close-btn {
+    background: none;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    color: var(--text-muted);
+    line-height: 1;
+  }
+
+  .detail-inner {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  .detail-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .detail-table th {
+    text-align: left;
+    padding: 6px 10px;
+    background: #f5f3ee;
+    font-weight: 700;
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    border-bottom: 1px solid var(--border);
+  }
+  .detail-table td {
+    padding: 7px 10px;
+    border-bottom: 1px solid #f0ede6;
+    color: var(--text);
+    line-height: 1.4;
+  }
+  .detail-table tr:last-child td { border-bottom: none; }
+  .detail-table .target-col { color: var(--text-muted); text-align: right; }
+  .detail-table .actual-good { color: var(--green); font-weight: 700; text-align: right; }
+  .detail-table .actual-warn { color: var(--yellow); font-weight: 700; text-align: right; }
+
+  /* ── Charts row ──────────────────────────── */
+  .charts-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+
+  .chart-card {
+    background: var(--white);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    padding: 20px 22px;
+  }
+
+  .chart-card h4 {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 14px;
+  }
+
+  .chart-wrap { position: relative; height: 220px; }
+
+  /* ── Footer ──────────────────────────────── */
+  .footer-strip {
+    background: var(--maroon);
+    border-radius: 10px;
+    padding: 13px 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .fs-step {
+    font-size: 12px;
+    color: rgba(255,255,255,0.85);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .fs-step .arr { color: rgba(255,255,255,0.4); font-size: 14px; }
+
+  /* ── Upload overlay ──────────────────────── */
+  .upload-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .upload-overlay.visible { display: flex; }
+
+  .upload-box {
+    background: var(--white);
+    border-radius: 14px;
+    padding: 36px 40px;
+    text-align: center;
+    max-width: 420px;
+    width: 90%;
+  }
+
+  .upload-box h2 { font-family: 'Playfair Display', serif; font-size: 20px; color: var(--maroon); margin-bottom: 10px; }
+  .upload-box p { font-size: 13px; color: var(--text-muted); margin-bottom: 22px; line-height: 1.6; }
+
+  .upload-drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    padding: 28px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    margin-bottom: 16px;
+  }
+
+  .upload-drop-zone:hover { border-color: var(--maroon); background: var(--maroon-bg); }
+  .upload-drop-zone .drop-icon { font-size: 32px; margin-bottom: 8px; }
+  .upload-drop-zone p { font-size: 12px; margin-bottom: 0; }
+
+  .cancel-btn {
+    background: none;
+    border: 1.5px solid var(--border);
+    border-radius: 6px;
+    padding: 7px 20px;
+    font-size: 13px;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-family: 'Source Sans 3', sans-serif;
+  }
+
+  /* ── Responsive ──────────────────────────── */
+  @media (max-width: 900px) {
+    .dim-grid, .summary-strip { grid-template-columns: repeat(2, 1fr); }
+    .charts-row { grid-template-columns: 1fr; }
+    .detail-inner { grid-template-columns: 1fr; }
+    .main { padding: 20px; }
+    .header, .controls-bar { padding: 16px 20px; }
+  }
+
+  @media (max-width: 560px) {
+    .dim-grid, .summary-strip { grid-template-columns: 1fr; }
+  }
+
+  /* loading state */
+  .loading-hint {
+    background: var(--yellow-bg);
+    border: 1px solid #ffe380;
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 12px;
+    color: var(--yellow);
+    font-weight: 600;
+    text-align: center;
+    margin-bottom: 22px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<div class="header">
+  <div class="header-left">
+    <h1>Impact Measurement Framework</h1>
+    <p>Measuring the success of <strong>Pack Your Learning Backpack</strong> across four key dimensions</p>
+  </div>
+  <div class="lilly-logo">Lilly</div>
+</div>
+
+<!-- ── CONTROLS BAR ── -->
+<div class="controls-bar">
+  <label>Quarter</label>
+  <button class="q-btn active" onclick="setQuarter(0, this)">Q1</button>
+  <button class="q-btn" onclick="setQuarter(1, this)">Q2</button>
+  <button class="q-btn" onclick="setQuarter(2, this)">Q3</button>
+  <button class="q-btn" onclick="setQuarter(3, this)">Q4</button>
+
+  <span class="data-source-badge" id="data-badge">Using built-in demo data</span>
+
+  <button class="upload-btn" onclick="document.getElementById('upload-overlay').classList.add('visible')">
+    &#8679; Load Excel Sheet
+  </button>
+  <input type="file" id="file-input" accept=".xlsx,.xls" onchange="handleFileUpload(event)">
+</div>
+
+<!-- ── MAIN ── -->
+<div class="main">
+
+  <div class="loading-hint" id="hint-bar">
+    📊 Dashboard running on built-in demo data. Click <strong>Load Excel Sheet</strong> to connect your <em>ITT_Impact_Data.xlsx</em> file.
+  </div>
+
+  <!-- Summary strip -->
+  <div class="summary-strip">
+    <div class="sum-card c1">
+      <div class="sum-num" id="s1-num">—</div>
+      <div class="sum-label">Trends / Tools Shared</div>
+      <div class="sum-sub" id="s1-sub">vs target —</div>
+    </div>
+    <div class="sum-card c2">
+      <div class="sum-num" id="s2-num">—</div>
+      <div class="sum-label">Team Participation</div>
+      <div class="sum-sub" id="s2-sub">vs target —</div>
+    </div>
+    <div class="sum-card c3">
+      <div class="sum-num" id="s3-num">—</div>
+      <div class="sum-label">Projects w/ New Practices</div>
+      <div class="sum-sub" id="s3-sub">vs target —</div>
+    </div>
+    <div class="sum-card c4">
+      <div class="sum-num" id="s4-num">—</div>
+      <div class="sum-label">Elevate Awards Given</div>
+      <div class="sum-sub" id="s4-sub">vs target —</div>
+    </div>
+  </div>
+
+  <!-- Dimension cards -->
+  <div class="dim-grid">
+    <div class="dim-card d1 active-card" id="card-d1" onclick="toggleDetail('d1')">
+      <div class="dim-head">
+        <div class="dim-num-circle">01</div>
+        <div class="dim-title-wrap">
+          <div class="dim-title">Learning &amp; Skill Acquisition</div>
+        </div>
+      </div>
+      <div class="dim-tag">Compass + Water Bottle</div>
+      <div class="dim-body">
+        <div class="metric-section-label">Key Metrics</div>
+        <div id="metrics-d1"></div>
+      </div>
+    </div>
+
+    <div class="dim-card d2" id="card-d2" onclick="toggleDetail('d2')">
+      <div class="dim-head">
+        <div class="dim-num-circle">02</div>
+        <div class="dim-title-wrap">
+          <div class="dim-title">Engagement &amp; Participation</div>
+        </div>
+      </div>
+      <div class="dim-tag">Campfire</div>
+      <div class="dim-body">
+        <div class="metric-section-label">Key Metrics</div>
+        <div id="metrics-d2"></div>
+      </div>
+    </div>
+
+    <div class="dim-card d3" id="card-d3" onclick="toggleDetail('d3')">
+      <div class="dim-head">
+        <div class="dim-num-circle">03</div>
+        <div class="dim-title-wrap">
+          <div class="dim-title">Application &amp; Performance</div>
+        </div>
+      </div>
+      <div class="dim-tag">The Map + Trail Markers</div>
+      <div class="dim-body">
+        <div class="metric-section-label">Key Metrics</div>
+        <div id="metrics-d3"></div>
+      </div>
+    </div>
+
+    <div class="dim-card d4" id="card-d4" onclick="toggleDetail('d4')">
+      <div class="dim-head">
+        <div class="dim-num-circle">04</div>
+        <div class="dim-title-wrap">
+          <div class="dim-title">Recognition &amp; Culture</div>
+        </div>
+      </div>
+      <div class="dim-tag">Trail Tokens + Travel Journal</div>
+      <div class="dim-body">
+        <div class="metric-section-label">Key Metrics</div>
+        <div id="metrics-d4"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detail panel -->
+  <div class="detail-panel" id="detail-panel">
+    <div class="detail-panel-head">
+      <h3 id="detail-title">Dimension Detail</h3>
+      <button class="close-btn" onclick="closeDetail()">&#x2715;</button>
+    </div>
+    <div class="detail-inner">
+      <div>
+        <table class="detail-table" id="detail-table">
+          <thead><tr><th>Metric</th><th class="target-col">Target</th><th class="target-col">Actual</th></tr></thead>
+          <tbody id="detail-tbody"></tbody>
+        </table>
+      </div>
+      <div>
+        <div class="chart-wrap"><canvas id="detail-chart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts row -->
+  <div class="charts-row">
+    <div class="chart-card">
+      <h4>Target vs Actual — All Dimensions (Selected Quarter)</h4>
+      <div class="chart-wrap"><canvas id="bar-chart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h4>Quarterly Trend — Team Participation (%)</h4>
+      <div class="chart-wrap"><canvas id="line-chart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Footer strip -->
+  <div class="footer-strip">
+    <span class="fs-step">Pre &amp; Post Survey <span class="arr">→</span></span>
+    <span class="fs-step">Participation Data <span class="arr">→</span></span>
+    <span class="fs-step">Project Tracking <span class="arr">→</span></span>
+    <span class="fs-step">Qualitative Stories</span>
+  </div>
+
+</div><!-- /main -->
+
+<!-- ── UPLOAD OVERLAY ── -->
+<div class="upload-overlay" id="upload-overlay">
+  <div class="upload-box">
+    <h2>Load Excel Data Sheet</h2>
+    <p>Upload your <strong>ITT_Impact_Data.xlsx</strong> file to populate the dashboard with live data. The file must follow the column structure: Dimension, Theme, Metric, Q1–Q4 Target &amp; Actual.</p>
+    <div class="upload-drop-zone" onclick="document.getElementById('file-input').click()"
+         ondragover="event.preventDefault()" ondrop="handleDrop(event)">
+      <div class="drop-icon">📂</div>
+      <p>Click to browse or drag &amp; drop your .xlsx file here</p>
+    </div>
+    <button class="cancel-btn" onclick="document.getElementById('upload-overlay').classList.remove('visible')">Cancel</button>
+  </div>
+</div>
+
+<script>
+// ── Demo data (mirrors the Excel sheet) ─────────────────────────
+const DEMO_DATA = [
+  {dim:"Learning & Skill Acquisition", metric:"# new trends/tools researched & shared", targets:[5,6,7,8], actuals:[4,6,8,7]},
+  {dim:"Learning & Skill Acquisition", metric:"Skill hydration demos per quarter",        targets:[3,3,3,3], actuals:[2,3,3,3]},
+  {dim:"Learning & Skill Acquisition", metric:"Vibe coding topics covered",               targets:[2,2,3,3], actuals:[1,2,3,3]},
+  {dim:"Engagement & Participation",   metric:"Quarterly challenge rollouts",             targets:[2,2,2,2], actuals:[2,2,2,2]},
+  {dim:"Engagement & Participation",   metric:"% of team members participating",          targets:[60,65,70,75], actuals:[55,68,72,78]},
+  {dim:"Engagement & Participation",   metric:"Templates & components contributed",       targets:[8,10,12,14], actuals:[6,11,13,15]},
+  {dim:"Application & Performance",    metric:"Projects with new practices applied",      targets:[4,5,6,7], actuals:[3,5,7,8]},
+  {dim:"Application & Performance",    metric:"Course dev time reduction (%)",            targets:[10,12,15,18], actuals:[8,13,14,19]},
+  {dim:"Application & Performance",    metric:"Learner satisfaction improvement (%)",     targets:[5,6,8,10], actuals:[4,7,8,11]},
+  {dim:"Recognition & Culture",        metric:"Elevate Awards given per quarter",         targets:[3,3,4,4], actuals:[3,4,4,5]},
+  {dim:"Recognition & Culture",        metric:"Impact stories shared in Townhalls",       targets:[2,2,3,3], actuals:[2,3,3,4]},
+  {dim:"Recognition & Culture",        metric:"Qualitative testimonials on innovation",   targets:[4,4,5,5], actuals:[3,5,5,6]},
+];
+
+const DIM_MAP = {
+  "Learning & Skill Acquisition": "d1",
+  "Engagement & Participation":   "d2",
+  "Application & Performance":    "d3",
+  "Recognition & Culture":        "d4",
+};
+
+const DIM_TITLES = {
+  d1: "Learning & Skill Acquisition",
+  d2: "Engagement & Participation",
+  d3: "Application & Performance",
+  d4: "Recognition & Culture",
+};
+
+const DIM_COLORS = {
+  d1: "#6B1A1A",
+  d2: "#C4521A",
+  d3: "#1D6B5A",
+  d4: "#4A3B8C",
+};
+
+let currentQ = 0;
+let activeDetail = null;
+let barChartInst = null;
+let lineChartInst = null;
+let detailChartInst = null;
+let sheetData = DEMO_DATA;
+
+// ── Parse uploaded Excel ─────────────────────────────────────────
+function handleDrop(e) {
+  e.preventDefault();
+  const file = e.dataTransfer.files[0];
+  if (file) readExcel(file);
+}
+
+function handleFileUpload(e) {
+  const file = e.target.files[0];
+  if (file) readExcel(file);
+  document.getElementById('upload-overlay').classList.remove('visible');
+}
+
+function readExcel(file) {
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const wb = XLSX.read(e.target.result, {type: 'array'});
+      const ws = wb.Sheets["Dashboard Data"] || wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header: 1, defval: ""});
+
+      // Find header row (row with "Metric" in column D or similar)
+      let startRow = -1;
+      for (let i = 0; i < rows.length; i++) {
+        if (String(rows[i][3]).toLowerCase().includes("metric")) { startRow = i + 1; break; }
+      }
+      if (startRow < 0) { alert("Could not find data in sheet. Make sure you're using ITT_Impact_Data.xlsx"); return; }
+
+      const parsed = [];
+      for (let i = startRow; i < rows.length; i++) {
+        const r = rows[i];
+        const dim = String(r[1] || "").trim();
+        const metric = String(r[3] || "").trim();
+        if (!dim || !metric) continue;
+        parsed.push({
+          dim,
+          metric,
+          targets: [+r[4]||0, +r[6]||0, +r[8]||0, +r[10]||0],
+          actuals: [+r[5]||0, +r[7]||0, +r[9]||0, +r[11]||0],
+        });
+      }
+
+      if (parsed.length === 0) { alert("No data rows found. Please check the file format."); return; }
+      sheetData = parsed;
+      document.getElementById('data-badge').textContent = "Live data: " + file.name;
+      document.getElementById('data-badge').style.background = "#d4edda";
+      document.getElementById('data-badge').style.color = "#155724";
+      document.getElementById('data-badge').style.borderColor = "#9fd8c6";
+      document.getElementById('hint-bar').style.display = 'none';
+      renderAll();
+    } catch(err) {
+      alert("Error reading file: " + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ── Render helpers ────────────────────────────────────────────────
+function setQuarter(q, btn) {
+  currentQ = q;
+  document.querySelectorAll('.q-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderAll();
+}
+
+function renderAll() {
+  renderSummary();
+  renderDimCards();
+  renderBarChart();
+  renderLineChart();
+  if (activeDetail) renderDetail(activeDetail);
+}
+
+function getByDim(dimKey) {
+  const title = DIM_TITLES[dimKey];
+  return sheetData.filter(d => d.dim === title || DIM_MAP[d.dim] === dimKey);
+}
+
+function renderSummary() {
+  const metrics = [
+    { key: "trends", searchDim: "d1", searchMetric: "trend", sid: "s1" },
+    { key: "participation", searchDim: "d2", searchMetric: "participating", sid: "s2", pct: true },
+    { key: "projects", searchDim: "d3", searchMetric: "project", sid: "s3" },
+    { key: "awards", searchDim: "d4", searchMetric: "award", sid: "s4" },
+  ];
+
+  metrics.forEach(m => {
+    const row = sheetData.find(d => (DIM_MAP[d.dim] === m.searchDim || d.dim === DIM_TITLES[m.searchDim]) &&
+                                     d.metric.toLowerCase().includes(m.searchMetric));
+    if (!row) return;
+    const tgt = row.targets[currentQ];
+    const act = row.actuals[currentQ];
+    const numEl = document.getElementById(m.sid + '-num');
+    const subEl = document.getElementById(m.sid + '-sub');
+    numEl.textContent = m.pct ? act + '%' : act;
+    const diff = act - tgt;
+    const cls = diff >= 0 ? 'pct-good' : 'pct-warn';
+    const sign = diff >= 0 ? '+' : '';
+    subEl.innerHTML = `Target ${m.pct ? tgt + '%' : tgt} &nbsp;<span class="${cls}">(${sign}${diff}${m.pct?'%':''})</span>`;
+  });
+}
+
+function renderDimCards() {
+  ['d1','d2','d3','d4'].forEach(dk => {
+    const rows = getByDim(dk);
+    const container = document.getElementById('metrics-' + dk);
+    container.innerHTML = '';
+    // Show top 3 metrics in card
+    rows.slice(0,3).forEach(row => {
+      const tgt = row.targets[currentQ];
+      const act = row.actuals[currentQ];
+      const pct = tgt > 0 ? Math.min(100, Math.round((act / tgt) * 100)) : 0;
+      const cls = act >= tgt ? 'good' : 'warn';
+      const val = row.metric.includes('%') ? act + '%' : act;
+      const tval = row.metric.includes('%') ? tgt + '%' : tgt;
+      container.innerHTML += `
+        <div class="metric-row">
+          <div class="metric-row-top">
+            <span class="m-label">${row.metric.replace(/^\s+-\s+/,'• ').replace(/^#+\s+/,'')}</span>
+            <span class="m-vals ${cls}">${val} / ${tval}</span>
+          </div>
+          <div class="mini-bar"><div class="mini-bar-fill" style="width:${pct}%"></div></div>
+        </div>`;
+    });
+  });
+}
+
+// ── Bar chart ─────────────────────────────────────────────────────
+function renderBarChart() {
+  const dims = ['d1','d2','d3','d4'];
+  const labels = ['Learning & Skill\nAcquisition','Engagement &\nParticipation','Application &\nPerformance','Recognition &\nCulture'];
+  const targets = [], actuals = [];
+
+  dims.forEach(dk => {
+    const rows = getByDim(dk);
+    const t = rows.reduce((s,r) => s + (r.targets[currentQ]||0), 0);
+    const a = rows.reduce((s,r) => s + (r.actuals[currentQ]||0), 0);
+    targets.push(t);
+    actuals.push(a);
+  });
+
+  if (barChartInst) barChartInst.destroy();
+  barChartInst = new Chart(document.getElementById('bar-chart'), {
+    type: 'bar',
+    data: {
+      labels: ['Learning','Engagement','Application','Recognition'],
+      datasets: [
+        { label: 'Target', data: targets, backgroundColor: 'rgba(107,26,26,0.18)', borderColor: '#6B1A1A', borderWidth: 1.5, borderRadius: 4 },
+        { label: 'Actual', data: actuals, backgroundColor: ['#6B1A1A','#C4521A','#1D6B5A','#4A3B8C'], borderRadius: 4 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+        y: { grid: { color: '#f0ede6' }, ticks: { font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+// ── Line chart ────────────────────────────────────────────────────
+function renderLineChart() {
+  const row = sheetData.find(d => d.metric.toLowerCase().includes('participating'));
+  if (!row) return;
+  if (lineChartInst) lineChartInst.destroy();
+  lineChartInst = new Chart(document.getElementById('line-chart'), {
+    type: 'line',
+    data: {
+      labels: ['Q1','Q2','Q3','Q4'],
+      datasets: [
+        { label: 'Target (%)', data: row.targets, borderColor: 'rgba(107,26,26,0.4)', borderDash: [5,4], borderWidth: 1.5, pointRadius: 3, fill: false, tension: 0.3 },
+        { label: 'Actual (%)', data: row.actuals, borderColor: '#1D6B5A', backgroundColor: 'rgba(29,107,90,0.08)', borderWidth: 2, pointRadius: 4, fill: true, tension: 0.3 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + ctx.parsed.y + '%' } }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+        y: { grid: { color: '#f0ede6' }, ticks: { font: { size: 10 }, callback: v => v + '%' }, min: 0, max: 100 }
+      }
+    }
+  });
+}
+
+// ── Detail panel ──────────────────────────────────────────────────
+function toggleDetail(dk) {
+  const panel = document.getElementById('detail-panel');
+  if (activeDetail === dk && panel.classList.contains('visible')) {
+    closeDetail(); return;
+  }
+  ['d1','d2','d3','d4'].forEach(k => {
+    document.getElementById('card-' + k).classList.toggle('active-card', k === dk);
+  });
+  activeDetail = dk;
+  panel.classList.add('visible');
+  renderDetail(dk);
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function closeDetail() {
+  document.getElementById('detail-panel').classList.remove('visible');
+  activeDetail = null;
+}
+
+function renderDetail(dk) {
+  const rows = getByDim(dk);
+  document.getElementById('detail-title').textContent = DIM_TITLES[dk] + ' — Q' + (currentQ+1) + ' Detail';
+  const tbody = document.getElementById('detail-tbody');
+  tbody.innerHTML = '';
+  rows.forEach(row => {
+    const tgt = row.targets[currentQ];
+    const act = row.actuals[currentQ];
+    const cls = act >= tgt ? 'actual-good' : 'actual-warn';
+    tbody.innerHTML += `<tr>
+      <td>${row.metric}</td>
+      <td class="target-col">${tgt}</td>
+      <td class="${cls}">${act}</td>
+    </tr>`;
+  });
+
+  if (detailChartInst) detailChartInst.destroy();
+  detailChartInst = new Chart(document.getElementById('detail-chart'), {
+    type: 'bar',
+    data: {
+      labels: rows.map(r => r.metric.length > 22 ? r.metric.substring(0,22)+'…' : r.metric),
+      datasets: [
+        { label: 'Target', data: rows.map(r => r.targets[currentQ]), backgroundColor: 'rgba(0,0,0,0.1)', borderColor: DIM_COLORS[dk], borderWidth: 1.5, borderRadius: 3 },
+        { label: 'Actual', data: rows.map(r => r.actuals[currentQ]), backgroundColor: DIM_COLORS[dk] + 'CC', borderRadius: 3 },
+      ]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: '#f0ede6' }, ticks: { font: { size: 10 } } },
+        y: { grid: { display: false }, ticks: { font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+// Init
+renderAll();
+</script>
+</body>
+</html>
